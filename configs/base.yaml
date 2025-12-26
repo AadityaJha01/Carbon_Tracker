@@ -1,0 +1,43 @@
+# Base Configuration for Carbon-Aware ML Training
+
+# Model Configuration
+model: resnet18  # Options: cnn, resnet18, mobilenet_v2
+dataset: cifar10  # Options: cifar10 (expandable)
+
+# Training Hyperparameters
+epochs: 100
+batch_size: 64
+learning_rate: 0.01
+optimizer: adam  # Options: adam, sgd
+momentum: 0.9  # For SGD
+weight_decay: 0.0001
+
+# Optimizations
+fp16: false  # Mixed precision training
+early_stop: false  # Early stopping
+early_stop_patience: 10  # Epochs to wait before stopping
+target_acc: null  # Target accuracy (optional, for early stopping)
+
+# Device Configuration
+device: cuda  # Options: cpu, cuda
+num_workers: 4  # DataLoader workers
+
+# Carbon Tracking
+region: null  # ISO 3166-1 alpha-2 country code (e.g., IN-TN for Chennai)
+  # If null, CodeCarbon will auto-detect or use default
+
+# Logging
+log_dir: ./results
+use_mlflow: true
+use_wandb: false
+wandb_project: carbon-ml-training
+
+# Output Configuration
+save_model: true
+save_plots: true
+save_csv: true
+leaderboard_file: ./results/leaderboard.csv
+
+# Reproducibility
+seed: 42
+

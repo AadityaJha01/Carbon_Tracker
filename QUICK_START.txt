@@ -1,0 +1,98 @@
+================================================================================
+CARBON-AWARE ML TRAINING PIPELINE - QUICK START GUIDE
+================================================================================
+
+STEP 1: VERIFY SETUP
+--------------------
+python verify_setup.py
+
+This will check:
+- Python version
+- Required packages
+- Project files
+- CUDA availability
+
+
+STEP 2: INSTALL DEPENDENCIES
+-----------------------------
+pip install -r requirements.txt
+
+This installs:
+- PyTorch & Torchvision
+- CodeCarbon (carbon tracking)
+- MLflow (experiment tracking)
+- Other dependencies
+
+
+STEP 3: QUICK TEST (2-5 minutes)
+---------------------------------
+python train.py --model cnn --dataset cifar10 --epochs 2 --batch_size 32
+
+This will:
+- Download CIFAR-10 dataset (first time)
+- Train a simple CNN for 2 epochs
+- Track energy and CO₂
+- Verify everything works
+
+
+STEP 4: TRAIN YOUR FIRST MODEL
+--------------------------------
+# Simple CNN (10-20 minutes)
+python train.py --model cnn --dataset cifar10 --epochs 20 --batch_size 64
+
+# ResNet18 (30-60 minutes)
+python train.py --model resnet18 --dataset cifar10 --epochs 50 --batch_size 128
+
+# MobileNetV2 with optimizations (20-40 minutes)
+python train.py --model mobilenet_v2 --dataset cifar10 --epochs 50 --batch_size 128 --fp16 --early_stop
+
+
+STEP 5: CHECK RESULTS
+----------------------
+After training, check:
+- results/leaderboard.csv - Compare all runs
+- results/leaderboard_plot.png - Visualizations
+- results/best_model.pt - Saved model weights
+
+
+COMMON COMMANDS
+---------------
+# Basic training
+python train.py --model <model_name> --dataset cifar10 --epochs <n> --batch_size <n>
+
+# With FP16 (faster, less memory)
+python train.py --model <model_name> --fp16
+
+# With early stopping (saves energy)
+python train.py --model <model_name> --early_stop --target_acc 85
+
+# With region-specific carbon tracking
+python train.py --model <model_name> --region IN-TN
+
+
+AVAILABLE MODELS
+----------------
+- cnn          : Simple CNN (fastest, baseline)
+- resnet18     : ResNet18 (good accuracy)
+- mobilenet_v2 : MobileNetV2 (most efficient)
+
+
+TROUBLESHOOTING
+---------------
+❌ CUDA out of memory?
+   → Reduce batch_size: --batch_size 32
+
+❌ ModuleNotFoundError?
+   → Install: pip install -r requirements.txt
+
+❌ Training too slow?
+   → Use FP16: --fp16
+   → Increase batch_size (if memory allows)
+
+
+FOR DETAILED INSTRUCTIONS
+--------------------------
+See: GETTING_STARTED.md
+
+================================================================================
+

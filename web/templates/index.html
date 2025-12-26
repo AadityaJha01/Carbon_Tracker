@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Carbon-Aware ML Training Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/a2d9b9b5d9.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <header class="hero">
+            <div class="hero-left">
+                <div class="brand">
+                    <div class="logo">🌱</div>
+                    <div class="brand-text">
+                        <h1>Carbon-Aware ML Dashboard</h1>
+                        <p class="subtitle">Train models, measure energy & CO₂, and compare efficiency</p>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-right">
+                <div class="actions">
+                    <button class="btn-ghost" onclick="window.location.reload()"><i class="fa fa-sync"></i> Refresh</button>
+                    <button class="btn-ghost" onclick="downloadLeaderboard()"><i class="fa fa-download"></i> Download CSV</button>
+                    <button class="btn-primary" onclick="showTab('train', document.getElementById('tab-train-btn'))">Start Training</button>
+                </div>
+            </div>
+        </header>
+
+        <nav class="tabs">
+            <button id="tab-dashboard-btn" class="tab-btn active" onclick="showTab('dashboard', this)">Dashboard</button>
+            <button id="tab-train-btn" class="tab-btn" onclick="showTab('train', this)">Train Model</button>
+            <button id="tab-leaderboard-btn" class="tab-btn" onclick="showTab('leaderboard', this)">Leaderboard</button>
+            <button id="tab-recommend-btn" class="tab-btn" onclick="showTab('recommend', this)">Recommendations</button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Runs</h3>
+                    <p class="stat-value" id="total-runs">-</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Energy</h3>
+                    <p class="stat-value" id="total-energy">-</p>
+                    <p class="stat-unit">kWh</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total CO₂</h3>
+                    <p class="stat-value" id="total-co2">-</p>
+                    <p class="stat-unit">grams</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Time</h3>
+                    <p class="stat-value" id="total-time">-</p>
+                    <p class="stat-unit">hours</p>
+                </div>
+            </div>
+
+            <div class="charts-section">
+                <div class="chart-container">
+                    <h3>Model Comparison</h3>
+                    <canvas id="modelChart"></canvas>
+                </div>
+            </div>
+
+            <div class="jobs-section">
+                <h3>Active Training Jobs</h3>
+                <div id="active-jobs"></div>
+            </div>
+        </div>
+
+        <!-- Train Model Tab -->
+        <div id="train" class="tab-content">
+            <div class="form-container">
+                <h2>Start New Training Job</h2>
+                <form id="training-form" onsubmit="startTraining(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="model">Model</label>
+                            <select id="model" name="model" required>
+                                <option value="resnet18">ResNet18</option>
+                                <option value="cnn">Simple CNN</option>
+                                <option value="mobilenet_v2">MobileNetV2</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dataset">Dataset</label>
+                            <select id="dataset" name="dataset" required>
+                                <option value="cifar10">CIFAR-10</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="epochs">Epochs</label>
+                            <input type="number" id="epochs" name="epochs" value="50" min="1" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="batch_size">Batch Size</label>
+                            <input type="number" id="batch_size" name="batch_size" value="64" min="1" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="learning_rate">Learning Rate</label>
+                            <input type="number" id="learning_rate" name="learning_rate" value="0.01" step="0.001" min="0.0001" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="optimizer">Optimizer</label>
+                            <select id="optimizer" name="optimizer">
+                                <option value="adam">Adam</option>
+                                <option value="sgd">SGD</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="device">Device</label>
+                            <select id="device" name="device">
+                                <option value="cuda">CUDA (GPU)</option>
+                                <option value="cpu">CPU</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="region">Region Code (for carbon tracking)</label>
+                            <input type="text" id="region" name="region" placeholder="e.g., IN-TN">
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="fp16" name="fp16">
+                                Use FP16 Mixed Precision
+                            </label>
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="early_stop" name="early_stop">
+                                Use Early Stopping
+                            </label>
+                        </div>
+
+                        <div class="form-group checkbox-group">
+                            <label>
+                                <input type="checkbox" id="demo_mode" name="demo_mode" checked>
+                                Demo Mode (fast simulated training)
+                            </label>
+                        </div>
+
+                        <div class="form-group" id="early-stop-options" style="display: none;">
+                            <label for="early_stop_patience">Early Stop Patience</label>
+                            <input type="number" id="early_stop_patience" name="early_stop_patience" value="10" min="1">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">Start Training</button>
+                </form>
+            </div>
+
+            <div id="training-status" class="training-status" style="display: none;">
+                <h3>Training Progress</h3>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+                <p id="progress-text">Initializing...</p>
+                <div id="training-metrics"></div>
+            </div>
+        </div>
+
+        <!-- Leaderboard Tab -->
+        <div id="leaderboard" class="tab-content">
+            <div class="leaderboard-container">
+                <h2>Model Efficiency Leaderboard</h2>
+                <div class="table-container">
+                    <table id="leaderboard-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Model</th>
+                                <th>Accuracy</th>
+                                <th>Energy (kWh)</th>
+                                <th>CO₂ (g)</th>
+                                <th>Time</th>
+                                <th>Efficiency</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboard-body">
+                            <tr><td colspan="7">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recommendations Tab -->
+        <div id="recommend" class="tab-content">
+            <div class="recommend-container">
+                <h2>Get Model Recommendations</h2>
+                
+                <div class="recommend-tabs">
+                    <button class="recommend-tab-btn active" onclick="showRecommendTab('accuracy', this)">By Accuracy</button>
+                    <button class="recommend-tab-btn" onclick="showRecommendTab('co2', this)">By CO₂ Budget</button>
+                    <button class="recommend-tab-btn" onclick="showRecommendTab('time', this)">By Time Budget</button>
+                </div>
+
+                <div id="recommend-accuracy" class="recommend-form active">
+                    <h3>Recommend by Target Accuracy</h3>
+                    <div class="form-group">
+                        <label for="target-accuracy">Target Accuracy (%)</label>
+                        <input type="number" id="target-accuracy" value="80" min="0" max="100" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="tolerance">Tolerance (%)</label>
+                        <input type="number" id="tolerance" value="2" min="0" step="0.1">
+                    </div>
+                    <button class="btn-primary" onclick="getRecommendation('accuracy')">Get Recommendation</button>
+                </div>
+
+                <div id="recommend-co2" class="recommend-form">
+                    <h3>Recommend by CO₂ Budget</h3>
+                    <div class="form-group">
+                        <label for="max-co2">Maximum CO₂ (grams)</label>
+                        <input type="number" id="max-co2" value="100" min="0" step="0.1">
+                    </div>
+                    <button class="btn-primary" onclick="getRecommendation('co2')">Get Recommendation</button>
+                </div>
+
+                <div id="recommend-time" class="recommend-form">
+                    <h3>Recommend by Time Budget</h3>
+                    <div class="form-group">
+                        <label for="max-time">Maximum Time (hours)</label>
+                        <input type="number" id="max-time" value="1" min="0" step="0.1">
+                    </div>
+                    <button class="btn-primary" onclick="getRecommendation('time')">Get Recommendation</button>
+                </div>
+
+                <div id="recommendation-result" class="recommendation-result" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+

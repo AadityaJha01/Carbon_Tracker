@@ -1,0 +1,14 @@
+data/cifar-10-python.tar.gz
+web/data/cifar-10-python.tar.gz
+data/*.tar.gz
+web/data/*.tar.gz
+data/cifar-10-batches-py/
+web/data/cifar-10-batches-py/
+results/
+*.pyc
+__pycache__/
+data/cifar-10-python.tar.gz
+web/data/cifar-10-python.tar.gz
+data/*.tar.gz
+web/data/*.tar.gz
+*.pyc

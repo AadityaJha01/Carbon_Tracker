@@ -19,7 +19,7 @@ project_root = os.path.join(os.path.dirname(__file__), '../..')
 sys.path.insert(0, os.path.abspath(project_root))
 
 from models import SimpleCNN, get_resnet18, get_mobilenet_v2
-from tracker import CarbonTracker
+from src.core.tracker import CarbonTracker
 from optimizers import FP16Trainer, EarlyStopping
 from logger import ExperimentLogger
 from leaderboard import Leaderboard

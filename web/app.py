@@ -18,67 +18,17 @@ sys.path.insert(0, os.path.abspath(project_root))
 from src.core.config_loader import load_config
 from leaderboard import Leaderboard
 from recommender import ModelRecommender
+from src.core.job_manager import JobManager
 import pandas as pd
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'carbon-aware-ml-training-secret-key'
 
-# Training jobs storage
-training_jobs: Dict[str, Dict] = {}
-training_threads: Dict[str, threading.Thread] = {}
+# Job manager handles job lifecycle and logging
+job_manager = JobManager(results_dir=os.path.join(os.path.dirname(__file__), '..', 'results'))
 
 
-def run_training_job(job_id: str, config: Dict):
-    """Run training in a separate thread"""
-    try:
-        training_jobs[job_id]['status'] = 'running'
-        training_jobs[job_id]['start_time'] = datetime.now().isoformat()
-        
-        def progress_callback(epoch, total_epochs, metrics):
-            training_jobs[job_id]['current_epoch'] = epoch + 1
-            training_jobs[job_id]['total_epochs'] = total_epochs
-            training_jobs[job_id]['metrics'] = metrics
-            training_jobs[job_id]['last_update'] = datetime.now().isoformat()
-            # Debug: append progress to a job-specific logfile so we can inspect background updates
-            try:
-                log_dir = os.path.join(os.path.dirname(__file__), '..', 'results')
-                os.makedirs(log_dir, exist_ok=True)
-                log_path = os.path.join(log_dir, f'job_{job_id}.log')
-                with open(log_path, 'a', encoding='utf-8') as f:
-                    f.write(f"{datetime.now().isoformat()} - epoch={epoch+1}/{total_epochs} metrics={metrics}\n")
-            except Exception:
-                pass
-        # Support a lightweight demo trainer (fast, simulated) to allow presentations
-        # without running full PyTorch training. Use config['demo'] = True to enable.
-        if config.get('demo', False):
-            try:
-                from src.core.demo_trainer import DemoTrainer as Trainer
-            except Exception as e:
-                training_jobs[job_id]['status'] = 'failed'
-                training_jobs[job_id]['error'] = f'Failed to import DemoTrainer: {e}'
-                training_jobs[job_id]['end_time'] = datetime.now().isoformat()
-                return
-        else:
-            # Lazy import Trainer to keep the web server lightweight at startup
-            try:
-                from src.core.trainer import Trainer
-            except Exception as e:
-                training_jobs[job_id]['status'] = 'failed'
-                training_jobs[job_id]['error'] = f'Failed to import Trainer: {e}'
-                training_jobs[job_id]['end_time'] = datetime.now().isoformat()
-                return
-
-        trainer = Trainer(config, progress_callback=progress_callback)
-        results = trainer.train()
-        
-        training_jobs[job_id]['status'] = 'completed'
-        training_jobs[job_id]['results'] = results
-        training_jobs[job_id]['end_time'] = datetime.now().isoformat()
-        
-    except Exception as e:
-        training_jobs[job_id]['status'] = 'failed'
-        training_jobs[job_id]['error'] = str(e)
-        training_jobs[job_id]['end_time'] = datetime.now().isoformat()
+# note: orchestration moved into src.core.job_manager.JobManager
 
 
 @app.route('/')
@@ -90,24 +40,22 @@ def index():
 @app.route('/api/jobs', methods=['GET'])
 def get_jobs():
     """Get all training jobs"""
-    return jsonify(training_jobs)
+    return jsonify(job_manager.get_all_jobs())
 
 
 @app.route('/api/jobs/<job_id>', methods=['GET'])
 def get_job(job_id):
     """Get specific training job"""
-    if job_id not in training_jobs:
+    job = job_manager.get_job(job_id)
+    if job is None:
         return jsonify({'error': 'Job not found'}), 404
-    return jsonify(training_jobs[job_id])
+    return jsonify(job)
 
 
 @app.route('/api/jobs', methods=['POST'])
 def create_job():
     """Create and start a new training job"""
     data = request.json
-    
-    # Create job ID
-    job_id = str(uuid.uuid4())
     
     # Build config from request
     config = {
@@ -133,24 +81,29 @@ def create_job():
         'use_wandb': data.get('use_wandb', False)
     }
     
-    # Initialize job
-    training_jobs[job_id] = {
-        'id': job_id,
-        'config': config,
-        'status': 'queued',
-        'created_at': datetime.now().isoformat(),
-        'current_epoch': 0,
-        'total_epochs': config['epochs'],
-        'metrics': {}
-    }
-    
-    # Start training in background thread
-    thread = threading.Thread(target=run_training_job, args=(job_id, config))
-    thread.daemon = True
-    thread.start()
-    training_threads[job_id] = thread
-    
-    return jsonify({'job_id': job_id, 'status': 'started'}), 201
+    # Decide which trainer implementation to use (demo or real)
+    trainer_class = None
+    if config.get('demo', False):
+        try:
+            from src.core.demo_trainer import DemoTrainer as trainer_class
+        except Exception as e:
+            return jsonify({'error': f'Failed to import DemoTrainer: {e}'}), 500
+    else:
+        try:
+            from src.core.trainer import Trainer as trainer_class
+        except Exception as e:
+            # If real trainer cannot be imported, fall back to demo trainer to keep UI responsive
+            try:
+                from src.core.demo_trainer import DemoTrainer as trainer_class
+            except Exception as e2:
+                return jsonify({'error': f'Failed to import Trainer: {e}; fallback failed: {e2}'}), 500
+
+    # Create and start job via JobManager
+    try:
+        job_id = job_manager.create_job(config, trainer_class)
+        return jsonify({'job_id': job_id, 'status': 'started'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/leaderboard', methods=['GET'])

@@ -20,6 +20,9 @@ class DemoTrainer:
         self.epochs = int(config.get('epochs', 10))
         self.model = config.get('model', 'demo_model')
         self.batch_size = int(config.get('batch_size', 32))
+        # Use a local RNG seeded for reproducibility in demo mode
+        seed = int(config.get('seed', 42))
+        self.rng = random.Random(seed)
 
     def train(self) -> Dict:
         start_time = datetime.now()
@@ -27,16 +30,16 @@ class DemoTrainer:
         best_epoch = 0
 
         # Simulate realistic per-epoch duration (seconds). For demo, use 8-20s per epoch
-        per_epoch_seconds = int(self.config.get('demo_epoch_seconds', random.randint(8, 20)))
+        per_epoch_seconds = int(self.config.get('demo_epoch_seconds', self.rng.randint(8, 20)))
         for epoch in range(self.epochs):
             # Simulate some work
             time.sleep(per_epoch_seconds)
 
             # Create fake metrics that improve slowly
-            train_loss = max(0.01, 2.0 / (epoch + 1) + random.random() * 0.1)
-            val_loss = train_loss + random.random() * 0.05
-            train_acc = min(100.0, 40 + epoch * (40.0 / max(1, self.epochs)) + random.random() * 2)
-            val_acc = train_acc - random.random() * 3
+            train_loss = max(0.01, 2.0 / (epoch + 1) + self.rng.random() * 0.1)
+            val_loss = train_loss + self.rng.random() * 0.05
+            train_acc = min(100.0, 40 + epoch * (40.0 / max(1, self.epochs)) + self.rng.random() * 2)
+            val_acc = train_acc - self.rng.random() * 3
 
             metrics = {
                 'train_loss': train_loss,
@@ -63,10 +66,10 @@ class DemoTrainer:
         device = (self.config.get('device') or 'cuda').lower()
         # Approximate power draw (Watts): CPU lighter, CUDA/GPU heavier
         if 'cpu' in device:
-            power_watts = random.randint(50, 120)
+            power_watts = self.rng.randint(50, 120)
         else:
             # GPU: moderate power for demo
-            power_watts = random.randint(150, 300)
+            power_watts = self.rng.randint(150, 300)
 
         # energy in kWh = power (W) * time (s) / 3600 / 1000
         energy_kwh = round((power_watts * training_time_sec) / 3600.0 / 1000.0, 6)

@@ -214,6 +214,32 @@ def get_stats():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/predict_epochs', methods=['POST'])
+def predict_epochs():
+    """Predict optimal epochs for a model based on historical runs."""
+    data = request.json or {}
+    model = data.get('model')
+    dataset = data.get('dataset')
+    threshold = float(data.get('threshold_gain_pct', 0.1))
+
+    if not model:
+        return jsonify({'error': 'Model name is required'}), 400
+
+    leaderboard_path = './results/leaderboard.csv'
+    if not os.path.exists(leaderboard_path):
+        return jsonify({'error': 'No leaderboard data available'}), 404
+
+    try:
+        df = pd.read_csv(leaderboard_path)
+        recommender = ModelRecommender(df)
+        result = recommender.predict_optimal_epochs(model=model, dataset=dataset, threshold_gain_pct=threshold)
+        if result is None:
+            return jsonify({'error': 'Could not produce a prediction with available data'}), 400
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/plots/<plot_name>')
 def get_plot(plot_name):
     """Serve plot images"""

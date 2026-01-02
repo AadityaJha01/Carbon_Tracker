@@ -3,6 +3,7 @@ Model recommendation system for optimal carbon-efficient training
 """
 
 import pandas as pd
+import numpy as np
 from typing import Dict, Optional, List, Tuple
 
 
@@ -205,4 +206,104 @@ class ModelRecommender:
             'energy_kwh': run['energy_kwh'],
             'training_time_sec': run['training_time_sec']
         }
+
+        def predict_optimal_epochs(
+            self,
+            model: str,
+            dataset: Optional[str] = None,
+            threshold_gain_pct: float = 0.1,
+            min_runs: int = 3
+        ) -> Optional[Dict]:
+            """
+            Predict an optimal number of epochs for `model` so that further epochs
+            yield less than `threshold_gain_pct` absolute accuracy gain per epoch.
+
+            Uses a simple asymptotic model: accuracy(E) = A * (1 - exp(-k * E)).
+            Fits k (and uses A as slightly-above-max observed accuracy) using
+            least-squares on historical final accuracies vs epochs. If insufficient
+            data is available, returns a heuristic based on average epochs.
+
+            Args:
+                model: Model name to analyze
+                dataset: Optional dataset filter
+                threshold_gain_pct: Absolute accuracy gain threshold per epoch (in percentage points)
+                min_runs: Minimum historical runs required to perform fit
+
+            Returns:
+                Dict with keys `predicted_epochs`, `model`, `reason`, `fits` (diagnostic)
+            """
+            df = self.df
+            if df.empty:
+                return None
+
+            sel = df[df['model'].str.lower() == model.lower()]
+            if dataset:
+                sel = sel[sel['dataset'].str.lower() == dataset.lower()] if 'dataset' in sel.columns else sel
+
+            if len(sel) < 1:
+                return None
+
+            # If insufficient runs for robust fitting, return simple heuristic
+            if len(sel) < min_runs:
+                avg_epochs = int(round(sel['epochs'].mean())) if 'epochs' in sel.columns else None
+                reason = 'Insufficient historical runs for curve fit; returning average epochs'
+                return {
+                    'model': model,
+                    'dataset': dataset,
+                    'predicted_epochs': avg_epochs,
+                    'reason': reason,
+                    'historical_runs': len(sel)
+                }
+
+            # Prepare arrays
+            epochs = sel['epochs'].astype(float).values
+            acc = sel['accuracy'].astype(float).values
+
+            # Use A as slightly above observed max accuracy but not above 100
+            max_acc = float(np.max(acc))
+            A = min(100.0, max_acc * 1.05)
+
+            # Avoid division by zero or log of non-positive numbers
+            acc_frac = np.clip(acc / A, 0.0, 0.999)
+            y = np.log(1.0 - acc_frac)
+
+            # Fit k in y = -k * epochs  (no intercept)
+            denom = np.sum(epochs ** 2)
+            if denom == 0:
+                return None
+            k = -np.sum(y * epochs) / denom
+
+            if k <= 0 or not np.isfinite(k):
+                return None
+
+            # Solve for epoch E where marginal gain < threshold_gain_pct
+            threshold = float(threshold_gain_pct)
+            # derivative dAcc/dE = A * k * exp(-kE) -> set equal to threshold
+            val = (threshold / (A * k))
+            if val <= 0:
+                return None
+            import math
+            E_opt = -math.log(val) / k
+
+            # Cap prediction to a reasonable max (e.g., 3x max observed epochs)
+            max_cap = max(epochs) * 3.0
+            predicted_epochs = int(min(math.ceil(E_opt), math.ceil(max_cap)))
+
+            reason = (
+                f"Fitted asymptotic model A={A:.2f}, k={k:.4f}. "
+                f"Predicted epochs until per-epoch gain < {threshold_gain_pct}%: {predicted_epochs}"
+            )
+
+            return {
+                'model': model,
+                'dataset': dataset,
+                'predicted_epochs': predicted_epochs,
+                'reason': reason,
+                'fits': {
+                    'A': A,
+                    'k': float(k),
+                    'max_observed_epochs': int(max(epochs)),
+                    'historical_runs': len(sel)
+                }
+            }
 

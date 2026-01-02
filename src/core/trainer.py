@@ -18,7 +18,7 @@ import sys
 project_root = os.path.join(os.path.dirname(__file__), '../..')
 sys.path.insert(0, os.path.abspath(project_root))
 
-from models import SimpleCNN, get_resnet18, get_mobilenet_v2
+from models import SimpleCNN, get_resnet18, get_mobilenet_v2, get_deep_cnn
 from src.core.tracker import CarbonTracker
 from optimizers import FP16Trainer, EarlyStopping
 from logger import ExperimentLogger
@@ -31,9 +31,11 @@ def get_model(model_name: str, num_classes: int = 10):
     
     if model_name == 'cnn':
         return SimpleCNN(num_classes=num_classes)
+    elif model_name == 'deep_cnn' or model_name == 'deepcnn' or model_name == 'deep-cnn':
+        return get_deep_cnn(num_classes=num_classes)
     elif model_name == 'resnet18':
         return get_resnet18(num_classes=num_classes)
-    elif model_name == 'mobilenet_v2':
+    elif model_name == 'mobilenet_v2' or model_name == 'mobilenet':
         return get_mobilenet_v2(num_classes=num_classes)
     else:
         raise ValueError(f"Unknown model: {model_name}")
@@ -70,6 +72,37 @@ def get_dataset(dataset_name: str, batch_size: int, num_workers: int = 4):
             test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
         )
         
+        return train_loader, test_loader, 10
+    elif dataset_name == 'mnist':
+        # MNIST: convert to RGB and resize to 32x32 so models built for CIFAR can run
+        transform_train = transforms.Compose([
+            transforms.Resize(32),
+            transforms.Lambda(lambda img: img.convert('RGB')),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(32),
+            transforms.Lambda(lambda img: img.convert('RGB')),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+        ])
+
+        train_dataset = torchvision.datasets.MNIST(
+            root='./data', train=True, download=True, transform=transform_train
+        )
+        test_dataset = torchvision.datasets.MNIST(
+            root='./data', train=False, download=True, transform=transform_test
+        )
+
+        train_loader = DataLoader(
+            train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers
+        )
+        test_loader = DataLoader(
+            test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+        )
+
         return train_loader, test_loader, 10
     else:
         raise ValueError(f"Unknown dataset: {dataset_name}")

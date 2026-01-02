@@ -4,6 +4,39 @@ Model recommendation system for optimal carbon-efficient training
 
 import pandas as pd
 import numpy as np
+from typing import Any
+
+
+def _native(x: Any):
+    """Convert numpy/pandas scalar types to native Python types for JSON.
+
+    Leaves lists and dicts intact; converts numpy arrays to lists.
+    """
+    # pandas timestamp
+    try:
+        import pandas as _pd
+        if isinstance(x, _pd.Timestamp):
+            return x.isoformat()
+    except Exception:
+        pass
+
+    # numpy scalar
+    if isinstance(x, np.generic):
+        return x.item()
+
+    # numpy array or pandas Series/Index
+    if isinstance(x, (np.ndarray, list, tuple)):
+        return list(x)
+
+    # pandas Series or Index
+    try:
+        if hasattr(x, 'tolist') and not isinstance(x, (str, bytes)):
+            return x.tolist()
+    except Exception:
+        pass
+
+    # fallback
+    return x
 from typing import Dict, Optional, List, Tuple
 
 
@@ -60,17 +93,17 @@ class ModelRecommender:
         run = best_run.iloc[0]
         
         recommendation = {
-            'model': run['model'],
-            'expected_accuracy': run['accuracy'],
-            'expected_co2_g': run['co2_g'],
-            'expected_energy_kwh': run['energy_kwh'],
-            'expected_time_sec': run['training_time_sec'],
-            'recommended_epochs': run['epochs'],
-            'recommended_batch_size': run['batch_size'],
-            'use_fp16': run.get('fp16', False),
-            'use_early_stop': run.get('early_stop', False),
-            'efficiency_score': run.get('accuracy_per_kwh', 0),
-            'reason': f"Lowest CO₂ ({run['co2_g']:.2f}g) while achieving ~{run['accuracy']:.1f}% accuracy"
+            'model': _native(run['model']),
+            'expected_accuracy': float(_native(run['accuracy'])),
+            'expected_co2_g': float(_native(run['co2_g'])),
+            'expected_energy_kwh': float(_native(run['energy_kwh'])),
+            'expected_time_sec': float(_native(run['training_time_sec'])),
+            'recommended_epochs': int(_native(run['epochs'])),
+            'recommended_batch_size': int(_native(run['batch_size'])),
+            'use_fp16': bool(_native(run.get('fp16', False))),
+            'use_early_stop': bool(_native(run.get('early_stop', False))),
+            'efficiency_score': float(_native(run.get('accuracy_per_kwh', 0))),
+            'reason': f"Lowest CO₂ ({float(_native(run['co2_g'])):.2f}g) while achieving ~{float(_native(run['accuracy'])):.1f}% accuracy"
         }
         
         return recommendation
@@ -102,17 +135,17 @@ class ModelRecommender:
         run = best_run.iloc[0]
         
         recommendation = {
-            'model': run['model'],
-            'expected_accuracy': run['accuracy'],
-            'expected_co2_g': run['co2_g'],
-            'expected_energy_kwh': run['energy_kwh'],
-            'expected_time_sec': run['training_time_sec'],
-            'recommended_epochs': run['epochs'],
-            'recommended_batch_size': run['batch_size'],
-            'use_fp16': run.get('fp16', False),
-            'use_early_stop': run.get('early_stop', False),
-            'efficiency_score': run.get('accuracy_per_kwh', 0),
-            'reason': f"Highest accuracy ({run['accuracy']:.1f}%) within CO₂ budget ({run['co2_g']:.2f}g)"
+            'model': _native(run['model']),
+            'expected_accuracy': float(_native(run['accuracy'])),
+            'expected_co2_g': float(_native(run['co2_g'])),
+            'expected_energy_kwh': float(_native(run['energy_kwh'])),
+            'expected_time_sec': float(_native(run['training_time_sec'])),
+            'recommended_epochs': int(_native(run['epochs'])),
+            'recommended_batch_size': int(_native(run['batch_size'])),
+            'use_fp16': bool(_native(run.get('fp16', False))),
+            'use_early_stop': bool(_native(run.get('early_stop', False))),
+            'efficiency_score': float(_native(run.get('accuracy_per_kwh', 0))),
+            'reason': f"Highest accuracy ({float(_native(run['accuracy'])):.1f}%) within CO₂ budget ({float(_native(run['co2_g'])):.2f}g)"
         }
         
         return recommendation
@@ -146,17 +179,17 @@ class ModelRecommender:
         run = best_run.iloc[0]
         
         recommendation = {
-            'model': run['model'],
-            'expected_accuracy': run['accuracy'],
-            'expected_co2_g': run['co2_g'],
-            'expected_energy_kwh': run['energy_kwh'],
-            'expected_time_sec': run['training_time_sec'],
-            'recommended_epochs': run['epochs'],
-            'recommended_batch_size': run['batch_size'],
-            'use_fp16': run.get('fp16', False),
-            'use_early_stop': run.get('early_stop', False),
-            'efficiency_score': run.get('accuracy_per_kwh', 0),
-            'reason': f"Highest accuracy ({run['accuracy']:.1f}%) within time budget ({max_time_hours:.1f}h)"
+            'model': _native(run['model']),
+            'expected_accuracy': float(_native(run['accuracy'])),
+            'expected_co2_g': float(_native(run['co2_g'])),
+            'expected_energy_kwh': float(_native(run['energy_kwh'])),
+            'expected_time_sec': float(_native(run['training_time_sec'])),
+            'recommended_epochs': int(_native(run['epochs'])),
+            'recommended_batch_size': int(_native(run['batch_size'])),
+            'use_fp16': bool(_native(run.get('fp16', False))),
+            'use_early_stop': bool(_native(run.get('early_stop', False))),
+            'efficiency_score': float(_native(run.get('accuracy_per_kwh', 0))),
+            'reason': f"Highest accuracy ({float(_native(run['accuracy'])):.1f}%) within time budget ({max_time_hours:.1f}h)"
         }
         
         return recommendation
@@ -198,13 +231,13 @@ class ModelRecommender:
         run = best_run.iloc[0]
         
         return {
-            'model': run['model'],
+            'model': _native(run['model']),
             'metric': metric,
-            'value': run[metric],
-            'accuracy': run['accuracy'],
-            'co2_g': run['co2_g'],
-            'energy_kwh': run['energy_kwh'],
-            'training_time_sec': run['training_time_sec']
+            'value': float(_native(run[metric])),
+            'accuracy': float(_native(run['accuracy'])),
+            'co2_g': float(_native(run['co2_g'])),
+            'energy_kwh': float(_native(run['energy_kwh'])),
+            'training_time_sec': float(_native(run['training_time_sec']))
         }
 
         def predict_optimal_epochs(
